@@ -14,6 +14,7 @@ class CircleAnnotationApp:
         self.canvas.bind("<Button-1>", self.on_click)
         self.canvas.bind("<B1-Motion>", self.on_drag)
         self.canvas.bind("<ButtonRelease-1>", self.on_release)
+
         self.undo_button = tk.Button(root, text="Undo", command=self.undo)
         self.undo_button.pack()
 
@@ -52,6 +53,7 @@ class CircleAnnotationApp:
         self.start_x = None
         self.start_y = None
         self.current_circle = None
+        self.current_center = None
 
 
     def on_click(self, event):
@@ -62,6 +64,9 @@ class CircleAnnotationApp:
         # Remove the previous circle
         if self.current_circle:
             self.canvas.delete(self.current_circle)
+
+        if self.current_center:
+            self.canvas.delete(self.current_center)
         
         # Calculate the radius
         radius = sqrt((event.x - self.start_x) ** 2 + (event.y - self.start_y) ** 2)
@@ -73,26 +78,46 @@ class CircleAnnotationApp:
             outline='red'
         )
 
+        # Draw the center point of the circle
+        center_size = 4  # Size of the center point, adjust as needed
+        self.current_center = self.canvas.create_oval(
+            self.start_x - center_size, self.start_y - center_size,
+            self.start_x + center_size, self.start_y + center_size,
+            fill='blue'
+        )
+
     def on_release(self, event):
         # Calculate the final radius and add the annotation
-        radius = sqrt((event.x - self.start_x) ** 2 + (event.y - self.start_y) ** 2)
-        self.annotations.append((self.current_circle, self.start_x, self.start_y, radius))
+        radius = sqrt((event.x - self.start_x) ** 2 + (event.y - self.start_y) ** 2) 
+        
+        # Normalize the coordinates and radius
+        norm_start_x = self.start_x / 1200  # Assuming 1200 is the width of the canvas
+        norm_start_y = self.start_y / 900   # Assuming 900 is the height of the canvas
+        norm_radius = radius / 1200         # Normalize based on the max dimension for aspect ratio
+
+        # Append the normalized annotation
+        self.annotations.append((self.current_circle, self.current_center, norm_start_x, norm_start_y, norm_radius))
+
         # self.annotations.append((self.start_x, self.start_y, radius))
         # Reset current circle
         self.current_circle = None
+        self.current_center = None
         print("Annotations:", self.annotations)
 
-    def undo(self):
+    def undo(self, event=None):
         if self.annotations:
-            last_annotation = self.annotations.pop()  # Remove the last annotation
-            self.canvas.delete(last_annotation[0])  # Delete it from the canvas
-        print("Undo: Removed last annotation.")
+            last_annotation = self.annotations.pop()
+            self.canvas.delete(last_annotation[0])  # Delete the circle from the canvas
+            if len(last_annotation) > 1:
+                # If you're storing the center point separately and want to delete it too
+                self.canvas.delete(last_annotation[1])
+            print("Undo: Removed last annotation.")
 
     def close_and_save(self):
         # Save the annotations to a file
         with open("annotations.txt", "w") as file:
             for annotation in self.annotations:
-                file.write(f"{annotation[0]},{annotation[1]},{annotation[2]}\n")
+                file.write(f"{annotation[2]},{annotation[3]},{annotation[4]}\n")
         print("Annotations saved to annotations.txt")
         self.root.destroy()
 
